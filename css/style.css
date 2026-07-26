@@ -1,0 +1,592 @@
+/* ==========================================================================
+   Linked List Candyland — Main Stylesheet
+   A candy-themed educational board game GUI
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap');
+
+/* ---------- CSS Custom Properties ---------- */
+:root {
+    --bg-primary: #fdf2f8;
+    --bg-secondary: #fff5f7;
+    --bg-card: #ffffff;
+    --bg-panel: rgba(255, 255, 255, 0.92);
+    --text-primary: #2d3436;
+    --text-secondary: #636e72;
+    --text-muted: #b2bec3;
+    --accent-pink: #fd79a8;
+    --accent-purple: #a29bfe;
+    --accent-blue: #74b9ff;
+    --accent-green: #55efc4;
+    --accent-orange: #fab1a0;
+    --accent-red: #ff6b6b;
+    --accent-yellow: #ffeaa7;
+    --shadow-soft: 0 2px 12px rgba(0,0,0,0.06);
+    --shadow-medium: 0 4px 24px rgba(0,0,0,0.10);
+    --shadow-glow: 0 0 20px rgba(253, 121, 168, 0.15);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s ease;
+    --font-primary: 'Fredoka', 'Comic Sans MS', cursive, sans-serif;
+    --sidebar-width: 340px;
+}
+
+/* ---------- Reset & Base ---------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    width: 100%; height: 100%;
+    font-family: var(--font-primary);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+body {
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(253,121,168,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(162,155,254,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 80%, rgba(116,185,255,0.08) 0%, transparent 50%),
+        var(--bg-primary);
+}
+
+/* ---------- Layout ---------- */
+.app-container {
+    display: flex;
+    width: 100%; height: 100vh;
+}
+
+/* ---------- Board Area ---------- */
+.board-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+}
+
+.board-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    z-index: 10;
+}
+
+.board-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.board-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.board-canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 30% 40%, rgba(253,121,168,0.04) 0%, transparent 50%),
+        radial-gradient(circle at 70% 60%, rgba(85,239,196,0.04) 0%, transparent 50%),
+        var(--bg-secondary);
+}
+
+#board-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------- Status Bar ---------- */
+.status-bar {
+    padding: 8px 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    transition: background var(--transition-normal), color var(--transition-normal);
+}
+
+.status-ok { background: #e8f8f0; color: #00b894; }
+.status-warning { background: #fef9e7; color: #f39c12; }
+.status-error { background: #fdeaea; color: #e74c3c; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+    width: var(--sidebar-width);
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    border-left: 1px solid rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.03);
+}
+
+.sidebar-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.sidebar-section h3 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+/* ---------- File Controls ---------- */
+.file-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    outline: none;
+}
+
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.btn:active { transform: translateY(0); }
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+    color: white;
+}
+.btn-primary:hover {
+    box-shadow: 0 4px 16px rgba(253,121,168,0.3);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid rgba(0,0,0,0.08);
+}
+.btn-secondary:hover { background: #fff; }
+
+.btn-game {
+    background: linear-gradient(135deg, var(--accent-green), #00b894);
+    color: white;
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+}
+.btn-game:hover { box-shadow: 0 4px 16px rgba(85,239,196,0.3); }
+.btn-game:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-new-game {
+    background: linear-gradient(135deg, var(--accent-orange), #e17055);
+    color: white;
+    width: 100%;
+    justify-content: center;
+    padding: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    margin-top: 8px;
+}
+.btn-new-game:hover { box-shadow: 0 4px 16px rgba(250,177,160,0.3); }
+
+/* ---------- File Input ---------- */
+.file-input-wrapper {
+    position: relative;
+    overflow: hidden;
+}
+.file-input-wrapper input[type="file"] {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* ---------- Debug Toggle ---------- */
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px; height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0; width: 0; height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #dfe6e9;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform var(--transition-fast);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* ---------- Game Controls ---------- */
+.game-setup {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.game-setup label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.game-setup select {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(0,0,0,0.1);
+    font-family: var(--font-primary);
+    font-size: 0.85rem;
+    background: white;
+    outline: none;
+}
+
+.current-player {
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 8px 0;
+}
+
+.last-card {
+    margin-top: 8px;
+}
+
+.card-display {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    color: #2d3436;
+    font-weight: 600;
+    font-size: 0.9rem;
+    box-shadow: var(--shadow-soft);
+}
+
+.no-card {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+/* ---------- Turn History ---------- */
+.history-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.history-list {
+    list-style: none;
+    padding: 0;
+}
+
+.history-entry {
+    padding: 8px 20px;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    animation: slideIn 0.3s ease;
+}
+
+.history-player {
+    font-weight: 600;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Debug Panel ---------- */
+.debug-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-slow);
+    background: #fafafa;
+    border-top: 1px solid rgba(0,0,0,0.05);
+}
+
+.debug-panel.visible {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.debug-section {
+    padding: 12px 20px;
+}
+
+.debug-section h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.debug-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.debug-section li {
+    font-size: 0.8rem;
+    padding: 4px 0;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.debug-errors h3 { color: #e74c3c; }
+.debug-warnings h3 { color: #f39c12; }
+.debug-tips h3 { color: #0984e3; }
+.debug-tips li { color: var(--text-secondary); }
+
+.debug-success {
+    text-align: center;
+    padding: 20px;
+}
+
+.debug-success h3 {
+    color: #00b894;
+    margin: 6px 0 4px;
+}
+
+.debug-success p {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+.debug-icon {
+    font-size: 1.1rem;
+    vertical-align: middle;
+}
+
+/* ---------- Branch Modal ---------- */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+}
+
+.modal-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.modal-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    max-width: 380px;
+    width: 90%;
+    box-shadow: var(--shadow-medium);
+    text-align: center;
+    animation: modalPop 0.3s ease;
+}
+
+@keyframes modalPop {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.modal-card h2 {
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.modal-card p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.branch-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    border: 2px solid rgba(0,0,0,0.08);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.branch-btn:hover {
+    background: white;
+    border-color: var(--accent-purple);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-soft);
+}
+
+.branch-id {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.branch-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+/* ---------- Win Banner ---------- */
+.win-banner {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    z-index: 1001;
+    opacity: 0;
+    pointer-events: none;
+    transition: all var(--transition-slow);
+}
+
+.win-banner.visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: all;
+}
+
+.win-banner .win-emoji {
+    font-size: 3rem;
+    margin-bottom: 8px;
+}
+
+.win-banner h2 {
+    font-size: 1.6rem;
+    background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange), var(--accent-pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 4px;
+}
+
+.win-banner p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+    .app-container {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        max-height: 40vh;
+        border-left: none;
+        border-top: 1px solid rgba(0,0,0,0.06);
+    }
+    .board-canvas-container {
+        min-height: 50vh;
+    }
+}
+
+@media (max-width: 600px) {
+    .board-header {
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px 12px;
+    }
+    .board-title {
+        font-size: 1.1rem;
+    }
+    :root {
+        --sidebar-width: 100%;
+    }
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }

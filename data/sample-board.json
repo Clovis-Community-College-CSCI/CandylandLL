@@ -1,0 +1,67 @@
+{
+  "title": "Linked List Candy Land",
+  "head": 1,
+  "zones": {
+    "Gumdrop Grove": {
+      "color": "#c9a0dc",
+      "accent": "#a06cc8",
+      "description": "A sweet valley of sugary gumdrops where your journey begins!"
+    },
+    "Licorice Loop": {
+      "color": "#f4a6c2",
+      "accent": "#e0789e",
+      "description": "A twisting ribbon of licorice that loops through the hills."
+    },
+    "Cookie Canyon": {
+      "color": "#d2a679",
+      "accent": "#b8864e",
+      "description": "A deep canyon carved from chocolate chip cookie dough."
+    },
+    "Marshmallow Meadows": {
+      "color": "#a8e6cf",
+      "accent": "#6bc9a0",
+      "description": "Soft, pillowy meadows dotted with marshmallow flowers."
+    },
+    "Lollipop Forest": {
+      "color": "#ffd3b6",
+      "accent": "#f0a878",
+      "description": "A dense forest of giant lollipop trees. The finish line awaits!"
+    }
+  },
+  "nodes": [
+    { "id": 1,  "color": "red",    "name": "Candy Cane Gate",      "zone": "Gumdrop Grove",       "next": [2],    "x": 0.05, "y": 0.50 },
+    { "id": 2,  "color": "blue",   "name": "Blueberry Bend",       "zone": "Gumdrop Grove",       "next": [3],    "x": 0.12, "y": 0.45 },
+    { "id": 3,  "color": "yellow", "name": "Lemon Drop Lane",      "zone": "Gumdrop Grove",       "next": [4],    "x": 0.19, "y": 0.40 },
+    { "id": 4,  "color": "green",  "name": "Gumdrop Garden",       "zone": "Gumdrop Grove",       "next": [5],    "x": 0.26, "y": 0.35 },
+    { "id": 5,  "color": "purple", "name": "Plum Pudding Plaza",   "zone": "Gumdrop Grove",       "next": [6, 16],"x": 0.33, "y": 0.30 },
+
+    { "id": 6,  "color": "orange", "name": "Tangerine Twist",      "zone": "Licorice Loop",       "next": [7],    "x": 0.40, "y": 0.22 },
+    { "id": 7,  "color": "red",    "name": "Cherry Chute",         "zone": "Licorice Loop",       "next": [8],    "x": 0.48, "y": 0.18 },
+    { "id": 8,  "color": "blue",   "name": "Sapphire Swirl",       "zone": "Licorice Loop",       "next": [9],    "x": 0.56, "y": 0.15 },
+    { "id": 9,  "color": "yellow", "name": "Butterscotch Bridge",  "zone": "Licorice Loop",       "next": [10],   "x": 0.64, "y": 0.18 },
+    { "id": 10, "color": "green",  "name": "Mint Meringue",        "zone": "Licorice Loop",       "next": [11],   "x": 0.72, "y": 0.22 },
+
+    { "id": 11, "color": "purple", "name": "Cookie Crumble Cliff", "zone": "Cookie Canyon",       "next": [12],   "x": 0.78, "y": 0.30 },
+    { "id": 12, "color": "orange", "name": "Caramel Cavern",       "zone": "Cookie Canyon",       "next": [13],   "x": 0.82, "y": 0.38 },
+    { "id": 13, "color": "red",    "name": "Snickerdoodle Summit", "zone": "Cookie Canyon",       "next": [14],   "x": 0.86, "y": 0.46 },
+    { "id": 14, "color": "blue",   "name": "Brownie Basin",        "zone": "Cookie Canyon",       "next": [15],   "x": 0.82, "y": 0.54 },
+    { "id": 15, "color": "yellow", "name": "Shortbread Shore",     "zone": "Cookie Canyon",       "next": [25],   "x": 0.78, "y": 0.62 },
+
+    { "id": 16, "color": "orange", "name": "Taffy Turn",           "zone": "Marshmallow Meadows", "next": [17],   "x": 0.33, "y": 0.45 },
+    { "id": 17, "color": "red",    "name": "Strawberry Stream",    "zone": "Marshmallow Meadows", "next": [18],   "x": 0.38, "y": 0.55 },
+    { "id": 18, "color": "green",  "name": "Pistachio Patch",      "zone": "Marshmallow Meadows", "next": [19],   "x": 0.44, "y": 0.62 },
+    { "id": 19, "color": "blue",   "name": "Cotton Candy Cloud",   "zone": "Marshmallow Meadows", "next": [20],   "x": 0.50, "y": 0.68 },
+    { "id": 20, "color": "purple", "name": "Marshmallow Mountain", "zone": "Marshmallow Meadows", "next": [21],   "x": 0.56, "y": 0.72 },
+    { "id": 21, "color": "yellow", "name": "Honeycomb Hollow",     "zone": "Marshmallow Meadows", "next": [22],   "x": 0.62, "y": 0.68 },
+    { "id": 22, "color": "orange", "name": "Peach Cobbler Pass",   "zone": "Marshmallow Meadows", "next": [23],   "x": 0.68, "y": 0.62 },
+    { "id": 23, "color": "red",    "name": "Raspberry Ridge",      "zone": "Marshmallow Meadows", "next": [24],   "x": 0.72, "y": 0.56 },
+    { "id": 24, "color": "green",  "name": "Lime Lagoon",          "zone": "Marshmallow Meadows", "next": [25],   "x": 0.76, "y": 0.50 },
+
+    { "id": 25, "color": "purple", "name": "Peppermint Path",      "zone": "Lollipop Forest",     "next": [26],   "x": 0.72, "y": 0.72 },
+    { "id": 26, "color": "orange", "name": "Toffee Trail",         "zone": "Lollipop Forest",     "next": [27],   "x": 0.64, "y": 0.78 },
+    { "id": 27, "color": "blue",   "name": "Bubblegum Bridge",     "zone": "Lollipop Forest",     "next": [28],   "x": 0.55, "y": 0.82 },
+    { "id": 28, "color": "yellow", "name": "Jellybean Junction",   "zone": "Lollipop Forest",     "next": [29],   "x": 0.45, "y": 0.85 },
+    { "id": 29, "color": "red",    "name": "Rock Candy Road",      "zone": "Lollipop Forest",     "next": [30],   "x": 0.35, "y": 0.88 },
+    { "id": 30, "color": "green",  "name": "Sugar Plum Palace",    "zone": "Lollipop Forest",     "next": [],     "x": 0.25, "y": 0.92 }
+  ]
+}

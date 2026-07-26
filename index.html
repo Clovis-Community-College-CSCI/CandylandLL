@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Linked List Candyland — An educational board game that teaches linked lists and pointers through a colorful Candyland-style game. For CSCI 41 / Data Structures courses.">
+    <title>Linked List Candyland — A Directed Journey!</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Board Area -->
+        <div class="board-area">
+            <header class="board-header">
+                <h1 id="board-title" class="board-title">🍬 Linked List Candyland</h1>
+                <div class="board-controls">
+                    <div class="toggle-wrapper">
+                        <span class="toggle-label">Debug Mode</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="debug-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </header>
+
+            <div class="board-canvas-container">
+                <canvas id="board-canvas"></canvas>
+            </div>
+
+            <div id="status-bar" class="status-bar status-ok">Loading board…</div>
+
+            <div id="debug-panel" class="debug-panel"></div>
+        </div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <!-- Load Board -->
+            <div class="sidebar-section">
+                <h3>📂 Load Board</h3>
+                <div class="file-controls">
+                    <button id="load-sample" class="btn btn-primary">🍭 Sample Board</button>
+                    <div class="file-input-wrapper">
+                        <button class="btn btn-secondary">📁 Your File</button>
+                        <input type="file" id="file-input" accept=".json">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Controls -->
+            <div class="sidebar-section">
+                <h3>🎮 Game Controls</h3>
+                <div class="game-setup">
+                    <label for="player-count">Players:</label>
+                    <select id="player-count">
+                        <option value="1">1 Player</option>
+                        <option value="2" selected>2 Players</option>
+                        <option value="3">3 Players</option>
+                        <option value="4">4 Players</option>
+                    </select>
+                </div>
+                <div id="current-player" class="current-player"></div>
+                <div id="last-card" class="last-card">
+                    <span class="no-card">No card drawn yet</span>
+                </div>
+                <button id="draw-card" class="btn btn-game">🃏 Draw Card</button>
+                <button id="new-game" class="btn btn-new-game">🔄 New Game</button>
+            </div>
+
+            <!-- Turn History -->
+            <div class="sidebar-section" style="flex-shrink: 0;">
+                <h3>📜 Turn History</h3>
+            </div>
+            <div class="history-container">
+                <ul id="history-list" class="history-list"></ul>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Branch Choice Modal -->
+    <div id="branch-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h2>🔀 Branch Point!</h2>
+            <p>This node has multiple NEXT pointers. Which path do you want to follow?</p>
+            <div id="branch-options"></div>
+        </div>
+    </div>
+
+    <!-- Win Banner -->
+    <div id="win-banner" class="win-banner">
+        <div class="win-emoji">🎉🏆🍬</div>
+        <h2>Congratulations!</h2>
+        <p id="win-message"></p>
+        <button class="btn btn-primary" onclick="document.getElementById('win-banner').classList.remove('visible')">Close</button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/board-loader.js"></script>
+    <script src="js/board-renderer.js"></script>
+    <script src="js/game-engine.js"></script>
+    <script src="js/debug-overlay.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
