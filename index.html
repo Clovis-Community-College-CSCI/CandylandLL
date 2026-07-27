@@ -1010,6 +1010,7 @@ class BoardLoader {
 /**
  * board-renderer.js
  * Renders the linked list board on a canvas element.
+ * Candy-themed board game style with path roads and decorations.
  */
 
 class BoardRenderer {
@@ -1018,28 +1019,32 @@ class BoardRenderer {
         this.ctx = canvas.getContext('2d');
         this.loader = loader;
         this.debugMode = false;
-        this.NODE_RADIUS = 28;
+        this.NODE_RADIUS = 32;
         this.ARROW_HEAD_SIZE = 10;
-        this.PADDING = 60;
+        this.PADDING = 80;
+        this.PATH_WIDTH = 18;
 
         this.COLOR_MAP = {
-            red:    { fill: '#ff6b6b', stroke: '#d63031', glow: '#ff8787' },
-            blue:   { fill: '#74b9ff', stroke: '#0984e3', glow: '#a0d2ff' },
-            yellow: { fill: '#ffeaa7', stroke: '#fdcb6e', glow: '#fff3c4' },
-            green:  { fill: '#55efc4', stroke: '#00b894', glow: '#81f5d8' },
-            purple: { fill: '#a29bfe', stroke: '#6c5ce7', glow: '#c3bfff' },
-            orange: { fill: '#fab1a0', stroke: '#e17055', glow: '#fcc8b8' },
-            gray:   { fill: '#b2bec3', stroke: '#636e72', glow: '#d5dde0' },
+            red:    { fill: '#ff4757', stroke: '#c0392b', glow: '#ff6b81', path: '#ffb8c0' },
+            blue:   { fill: '#3b82f6', stroke: '#1d4ed8', glow: '#60a5fa', path: '#bfdbfe' },
+            yellow: { fill: '#fbbf24', stroke: '#d97706', glow: '#fcd34d', path: '#fde68a' },
+            green:  { fill: '#22c55e', stroke: '#15803d', glow: '#4ade80', path: '#a7f3d0' },
+            purple: { fill: '#8b5cf6', stroke: '#6d28d9', glow: '#a78bfa', path: '#c4b5fd' },
+            orange: { fill: '#f97316', stroke: '#c2410c', glow: '#fb923c', path: '#fed7aa' },
+            gray:   { fill: '#94a3b8', stroke: '#475569', glow: '#cbd5e1', path: '#e2e8f0' },
         };
 
         this.hoverNode = null;
         this.selectedNode = null;
-        this.playerPositions = {};  // playerId -> nodeId
+        this.playerPositions = {};
         this.playerColors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12'];
         this.pulsePhase = 0;
         this._mouseX = 0;
         this._mouseY = 0;
         this._nodePositions = new Map();
+        // Pre-computed candy decorations (sprinkles, stars) per-board
+        this._decorations = [];
+        this._decorationsComputed = false;
 
         this.canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
         this.canvas.addEventListener('click', (e) => this._onClick(e));
@@ -1061,6 +1066,7 @@ class BoardRenderer {
 
     _computePositions() {
         this._nodePositions.clear();
+        this._decorationsComputed = false;
         const hasManual = [...this.loader.nodes.values()].some(n => n.x !== null && n.y !== null);
         if (hasManual) {
             for (const [id, node] of this.loader.nodes) {
@@ -1073,6 +1079,7 @@ class BoardRenderer {
         } else {
             this._autoLayoutNodes([...this.loader.nodes.values()]);
         }
+        this._computeLabelPositions();
     }
 
     _autoLayoutNodes(nodes) {
@@ -1085,6 +1092,122 @@ class BoardRenderer {
         });
     }
 
+    /**
+     * Compute smart label positions for each node.
+     * Places labels AWAY from the centroid of neighboring nodes
+     * to avoid text overlapping adjacent circles.
+     */
+    _computeLabelPositions() {
+        this._labelOffsets = new Map();
+
+        // Build adjacency in both directions
+        const neighbors = new Map();
+        for (const [id] of this.loader.nodes) neighbors.set(id, []);
+        for (const [id, node] of this.loader.nodes) {
+            for (const nextId of node.next) {
+                if (neighbors.has(id)) neighbors.get(id).push(nextId);
+                if (neighbors.has(nextId)) neighbors.get(nextId).push(id);
+            }
+        }
+
+        for (const [id] of this.loader.nodes) {
+            const pos = this._nodePositions.get(id);
+            if (!pos) { this._labelOffsets.set(id, { dx: 0, dy: 1, align: 'center', baseline: 'top' }); continue; }
+
+            const nids = neighbors.get(id) || [];
+            if (nids.length === 0) {
+                this._labelOffsets.set(id, { dx: 0, dy: 1, align: 'center', baseline: 'top' });
+                continue;
+            }
+
+            // Compute average direction to neighbors
+            let avgDx = 0, avgDy = 0, count = 0;
+            for (const nid of nids) {
+                const npos = this._nodePositions.get(nid);
+                if (!npos) continue;
+                avgDx += npos.x - pos.x;
+                avgDy += npos.y - pos.y;
+                count++;
+            }
+            if (count === 0) {
+                this._labelOffsets.set(id, { dx: 0, dy: 1, align: 'center', baseline: 'top' });
+                continue;
+            }
+            avgDx /= count;
+            avgDy /= count;
+
+            // "Away" direction (opposite of average neighbor direction)
+            const len = Math.sqrt(avgDx * avgDx + avgDy * avgDy);
+            if (len < 1) {
+                this._labelOffsets.set(id, { dx: 0, dy: 1, align: 'center', baseline: 'top' });
+                continue;
+            }
+            const awayX = -avgDx / len;
+            const awayY = -avgDy / len;
+
+            // Snap to cardinal direction for clean text rendering
+            let dx, dy, align, baseline;
+            if (Math.abs(awayX) > Math.abs(awayY) * 1.2) {
+                // Horizontal (left or right)
+                dx = Math.sign(awayX);
+                dy = 0;
+                align = dx > 0 ? 'left' : 'right';
+                baseline = 'middle';
+            } else {
+                // Vertical (above or below)
+                dx = 0;
+                dy = Math.sign(awayY);
+                align = 'center';
+                baseline = dy > 0 ? 'top' : 'bottom';
+            }
+            this._labelOffsets.set(id, { dx, dy, align, baseline });
+        }
+    }
+
+    /**
+     * Generate random candy decorations scattered across the board.
+     */
+    _computeDecorations() {
+        if (this._decorationsComputed) return;
+        this._decorations = [];
+        const w = this.canvas.width, h = this.canvas.height;
+        const rng = (a, b) => a + Math.random() * (b - a);
+        const candyColors = ['#ff6b6b', '#74b9ff', '#ffeaa7', '#55efc4', '#a29bfe', '#fab1a0', '#fd79a8'];
+        // Sprinkles
+        for (let i = 0; i < 60; i++) {
+            this._decorations.push({
+                type: 'sprinkle',
+                x: rng(20, w - 20), y: rng(20, h - 20),
+                angle: rng(0, Math.PI * 2),
+                length: rng(6, 14),
+                color: candyColors[Math.floor(Math.random() * candyColors.length)],
+                alpha: rng(0.08, 0.18),
+            });
+        }
+        // Stars
+        for (let i = 0; i < 20; i++) {
+            this._decorations.push({
+                type: 'star',
+                x: rng(30, w - 30), y: rng(30, h - 30),
+                size: rng(3, 7),
+                color: candyColors[Math.floor(Math.random() * candyColors.length)],
+                alpha: rng(0.06, 0.15),
+                phaseOffset: rng(0, Math.PI * 2),
+            });
+        }
+        // Small circles (candy dots)
+        for (let i = 0; i < 30; i++) {
+            this._decorations.push({
+                type: 'dot',
+                x: rng(20, w - 20), y: rng(20, h - 20),
+                size: rng(2, 5),
+                color: candyColors[Math.floor(Math.random() * candyColors.length)],
+                alpha: rng(0.06, 0.14),
+            });
+        }
+        this._decorationsComputed = true;
+    }
+
     render(timestamp) {
         const dt = timestamp - this._lastTime;
         this._lastTime = timestamp;
@@ -1092,12 +1215,57 @@ class BoardRenderer {
         const ctx = this.ctx, w = this.canvas.width, h = this.canvas.height;
         ctx.clearRect(0, 0, w, h);
         if (this._nodePositions.size === 0) this._computePositions();
+        this._computeDecorations();
+        this._drawDecorations(ctx);
         this._drawZones(ctx);
-        this._drawArrows(ctx);
+        this._drawPaths(ctx);
+        if (this.debugMode) this._drawDebugArrows(ctx);
         this._drawNodes(ctx, timestamp);
         this._drawHeadMarker(ctx);
         this._drawPlayerTokens(ctx);
         if (this.hoverNode !== null) this._drawTooltip(ctx);
+    }
+
+    /**
+     * Draw background candy decorations.
+     */
+    _drawDecorations(ctx) {
+        for (const d of this._decorations) {
+            ctx.save();
+            ctx.globalAlpha = d.alpha;
+            if (d.type === 'sprinkle') {
+                ctx.translate(d.x, d.y);
+                ctx.rotate(d.angle);
+                ctx.fillStyle = d.color;
+                ctx.beginPath();
+                ctx.roundRect(-d.length / 2, -2, d.length, 4, 2);
+                ctx.fill();
+            } else if (d.type === 'star') {
+                const twinkle = 0.7 + 0.3 * Math.sin(this.pulsePhase * 1.5 + d.phaseOffset);
+                ctx.globalAlpha = d.alpha * twinkle;
+                ctx.fillStyle = d.color;
+                this._drawStarShape(ctx, d.x, d.y, d.size, 4);
+            } else if (d.type === 'dot') {
+                ctx.fillStyle = d.color;
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, d.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    _drawStarShape(ctx, cx, cy, r, points) {
+        ctx.beginPath();
+        for (let i = 0; i < points * 2; i++) {
+            const angle = (i * Math.PI) / points - Math.PI / 2;
+            const radius = i % 2 === 0 ? r : r * 0.4;
+            const x = cx + Math.cos(angle) * radius;
+            const y = cy + Math.sin(angle) * radius;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
     }
 
     _drawZones(ctx) {
@@ -1112,34 +1280,65 @@ class BoardRenderer {
             if (positions.length === 0) continue;
             const zoneDef = this.loader.zones[zoneName];
             const color = zoneDef ? zoneDef.color : '#f0f0f0';
-            const pad = 50;
+            const accent = zoneDef ? zoneDef.accent : '#888';
+            const pad = 65;
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            for (const p of positions) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+            for (const p of positions) {
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+            }
+
+            // Candy-themed zone background with gradient
             ctx.save();
-            ctx.globalAlpha = 0.15;
+            const zw = maxX - minX + 2 * pad, zh = maxY - minY + 2 * pad;
+            const zx = minX - pad, zy = minY - pad;
+            const zoneGrad = ctx.createLinearGradient(zx, zy, zx + zw, zy + zh);
+            zoneGrad.addColorStop(0, color + '20');
+            zoneGrad.addColorStop(0.5, color + '12');
+            zoneGrad.addColorStop(1, color + '20');
+            ctx.fillStyle = zoneGrad;
+            ctx.beginPath();
+            this._roundRect(ctx, zx, zy, zw, zh, 28);
+            ctx.fill();
+            // Dashed border
+            ctx.globalAlpha = 0.2;
+            ctx.strokeStyle = accent;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 6]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+
+            // Zone label with background pill
+            ctx.save();
+            ctx.font = 'bold 14px "Fredoka", "Comic Sans MS", cursive';
+            const textWidth = ctx.measureText(zoneName).width;
+            const labelX = (minX + maxX) / 2;
+            const labelY = minY - pad + 18;
+            // Pill background
+            ctx.globalAlpha = 0.7;
             ctx.fillStyle = color;
             ctx.beginPath();
-            this._roundRect(ctx, minX - pad, minY - pad, maxX - minX + 2 * pad, maxY - minY + 2 * pad, 20);
+            this._roundRect(ctx, labelX - textWidth / 2 - 12, labelY - 12, textWidth + 24, 22, 11);
             ctx.fill();
-            ctx.globalAlpha = 0.3;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.restore();
-            ctx.save();
-            ctx.globalAlpha = 0.6;
-            ctx.fillStyle = zoneDef ? zoneDef.accent : '#888';
-            ctx.font = 'bold 13px "Fredoka", "Comic Sans MS", cursive';
+            // Label text
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#fff';
             ctx.textAlign = 'center';
-            ctx.fillText(zoneName, (minX + maxX) / 2, minY - pad + 16);
+            ctx.textBaseline = 'middle';
+            ctx.fillText(zoneName, labelX, labelY);
             ctx.restore();
         }
     }
 
-    _drawArrows(ctx) {
+    /**
+     * Draw the candy path road between connected nodes.
+     */
+    _drawPaths(ctx) {
         for (const [id, node] of this.loader.nodes) {
             const fromPos = this._nodePositions.get(id);
             if (!fromPos) continue;
+
             for (let i = 0; i < node.next.length; i++) {
                 const nextId = node.next[i];
                 const toPos = this._nodePositions.get(nextId);
@@ -1147,6 +1346,136 @@ class BoardRenderer {
                     if (this.debugMode) this._drawBrokenArrow(ctx, fromPos, nextId);
                     continue;
                 }
+
+                const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist === 0) continue;
+
+                const isBranch = node.next.length > 1;
+                const nextNode = this.loader.nodes.get(nextId);
+                const pathColor = nextNode ? (this.COLOR_MAP[nextNode.color] || this.COLOR_MAP.gray).path : '#e8e8e8';
+
+                ctx.save();
+
+                // Determine control point for curved path
+                const nx = dx / dist, ny = dy / dist;
+                let cpX, cpY;
+                if (isBranch) {
+                    const cs = (i === 0 ? -1 : 1) * Math.min(60, dist * 0.3);
+                    cpX = (fromPos.x + toPos.x) / 2 + (-ny) * cs;
+                    cpY = (fromPos.y + toPos.y) / 2 + nx * cs;
+                } else {
+                    cpX = (fromPos.x + toPos.x) / 2;
+                    cpY = (fromPos.y + toPos.y) / 2;
+                }
+
+                // Draw thick candy road
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // Road shadow
+                ctx.globalAlpha = 0.08;
+                ctx.strokeStyle = '#2d3436';
+                ctx.lineWidth = this.PATH_WIDTH + 6;
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                if (isBranch) {
+                    ctx.quadraticCurveTo(cpX, cpY, toPos.x, toPos.y);
+                } else {
+                    ctx.lineTo(toPos.x, toPos.y);
+                }
+                ctx.stroke();
+
+                // Road border
+                ctx.globalAlpha = 0.35;
+                ctx.strokeStyle = nextNode ? (this.COLOR_MAP[nextNode.color] || this.COLOR_MAP.gray).stroke : '#999';
+                ctx.lineWidth = this.PATH_WIDTH + 4;
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                if (isBranch) {
+                    ctx.quadraticCurveTo(cpX, cpY, toPos.x, toPos.y);
+                } else {
+                    ctx.lineTo(toPos.x, toPos.y);
+                }
+                ctx.stroke();
+
+                // Road fill
+                ctx.globalAlpha = 0.5;
+                ctx.strokeStyle = pathColor;
+                ctx.lineWidth = this.PATH_WIDTH;
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                if (isBranch) {
+                    ctx.quadraticCurveTo(cpX, cpY, toPos.x, toPos.y);
+                } else {
+                    ctx.lineTo(toPos.x, toPos.y);
+                }
+                ctx.stroke();
+
+                // Center dashed line (road markings)
+                ctx.globalAlpha = 0.25;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6, 8]);
+                ctx.beginPath();
+                ctx.moveTo(fromPos.x, fromPos.y);
+                if (isBranch) {
+                    ctx.quadraticCurveTo(cpX, cpY, toPos.x, toPos.y);
+                } else {
+                    ctx.lineTo(toPos.x, toPos.y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Directional arrowhead at midpoint of path
+                const t = 0.55; // slightly past midpoint toward destination
+                let midX, midY, tangentX, tangentY;
+                if (isBranch) {
+                    // Point on quadratic Bezier: B(t) = (1-t)^2*P0 + 2*(1-t)*t*CP + t^2*P1
+                    midX = (1-t)*(1-t)*fromPos.x + 2*(1-t)*t*cpX + t*t*toPos.x;
+                    midY = (1-t)*(1-t)*fromPos.y + 2*(1-t)*t*cpY + t*t*toPos.y;
+                    // Tangent: B'(t) = 2*(1-t)*(CP-P0) + 2*t*(P1-CP)
+                    tangentX = 2*(1-t)*(cpX-fromPos.x) + 2*t*(toPos.x-cpX);
+                    tangentY = 2*(1-t)*(cpY-fromPos.y) + 2*t*(toPos.y-cpY);
+                } else {
+                    midX = fromPos.x + t * dx;
+                    midY = fromPos.y + t * dy;
+                    tangentX = dx;
+                    tangentY = dy;
+                }
+                const tLen = Math.sqrt(tangentX*tangentX + tangentY*tangentY);
+                if (tLen > 0) {
+                    const tnx = tangentX / tLen, tny = tangentY / tLen;
+                    const arrowSize = 10;
+                    ctx.globalAlpha = 0.55;
+                    ctx.fillStyle = nextNode ? (this.COLOR_MAP[nextNode.color] || this.COLOR_MAP.gray).stroke : '#666';
+                    ctx.beginPath();
+                    ctx.moveTo(midX + tnx * arrowSize, midY + tny * arrowSize);
+                    ctx.lineTo(midX - tnx * arrowSize * 0.3 + (-tny) * arrowSize * 0.6, midY - tny * arrowSize * 0.3 + tnx * arrowSize * 0.6);
+                    ctx.lineTo(midX - tnx * arrowSize * 0.3 - (-tny) * arrowSize * 0.6, midY - tny * arrowSize * 0.3 - tnx * arrowSize * 0.6);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+
+            if (node.next.length === 0) this._drawNullTerminator(ctx, fromPos);
+        }
+    }
+
+    /**
+     * Draw arrows and NEXT labels — only in debug mode.
+     */
+    _drawDebugArrows(ctx) {
+        for (const [id, node] of this.loader.nodes) {
+            const fromPos = this._nodePositions.get(id);
+            if (!fromPos) continue;
+            for (let i = 0; i < node.next.length; i++) {
+                const nextId = node.next[i];
+                const toPos = this._nodePositions.get(nextId);
+                if (!toPos) continue;
+
                 const isBranch = node.next.length > 1;
                 const dx = toPos.x - fromPos.x, dy = toPos.y - fromPos.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1154,8 +1483,9 @@ class BoardRenderer {
                 const nx = dx / dist, ny = dy / dist;
                 const sx = fromPos.x + nx * (this.NODE_RADIUS + 4), sy = fromPos.y + ny * (this.NODE_RADIUS + 4);
                 const ex = toPos.x - nx * (this.NODE_RADIUS + 4), ey = toPos.y - ny * (this.NODE_RADIUS + 4);
+
                 ctx.save();
-                if (this.debugMode && node.inCycle && this.loader.nodes.get(nextId)?.inCycle) {
+                if (node.inCycle && this.loader.nodes.get(nextId)?.inCycle) {
                     ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 3; ctx.setLineDash([8, 4]);
                 } else if (isBranch) {
                     ctx.strokeStyle = i === 0 ? '#e17055' : '#00b894'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
@@ -1165,17 +1495,18 @@ class BoardRenderer {
                 ctx.globalAlpha = 0.7;
                 ctx.beginPath();
                 if (isBranch) {
-                    const cs = (i === 0 ? -1 : 1) * 30;
+                    const cs = (i === 0 ? -1 : 1) * Math.min(60, dist * 0.3);
                     const cpX = (sx + ex) / 2 + (-ny) * cs, cpY = (sy + ey) / 2 + nx * cs;
                     ctx.moveTo(sx, sy); ctx.quadraticCurveTo(cpX, cpY, ex, ey);
                 } else {
                     ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
                 }
                 ctx.stroke();
+
                 // Arrowhead
                 let aa = Math.atan2(ey - sy, ex - sx);
                 if (isBranch) {
-                    const cs = (i === 0 ? -1 : 1) * 30;
+                    const cs = (i === 0 ? -1 : 1) * Math.min(60, dist * 0.3);
                     const cpX = (sx + ex) / 2 + (-ny) * cs, cpY = (sy + ey) / 2 + nx * cs;
                     aa = Math.atan2(ey - cpY, ex - cpX);
                 }
@@ -1184,24 +1515,37 @@ class BoardRenderer {
                 ctx.lineTo(ex - this.ARROW_HEAD_SIZE * Math.cos(aa - Math.PI / 6), ey - this.ARROW_HEAD_SIZE * Math.sin(aa - Math.PI / 6));
                 ctx.lineTo(ex - this.ARROW_HEAD_SIZE * Math.cos(aa + Math.PI / 6), ey - this.ARROW_HEAD_SIZE * Math.sin(aa + Math.PI / 6));
                 ctx.closePath(); ctx.fill();
+
                 // NEXT label
                 ctx.globalAlpha = 0.5; ctx.fillStyle = '#2d3436'; ctx.font = '9px "Fredoka", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 const la = Math.atan2(dy, dx);
                 ctx.fillText('NEXT', (sx + ex) / 2 - Math.sin(la) * 12, (sy + ey) / 2 + Math.cos(la) * 12);
                 ctx.restore();
             }
-            if (node.next.length === 0) this._drawNullTerminator(ctx, fromPos);
         }
     }
 
     _drawNullTerminator(ctx, pos) {
-        const y = pos.y + this.NODE_RADIUS + 18;
+        const r = this.NODE_RADIUS;
+        const flagY = pos.y + r + 22;
         ctx.save();
-        ctx.strokeStyle = '#636e72'; ctx.lineWidth = 2; ctx.globalAlpha = 0.7;
-        ctx.beginPath(); ctx.moveTo(pos.x, pos.y + this.NODE_RADIUS + 4); ctx.lineTo(pos.x, y - 4); ctx.stroke();
-        ctx.fillStyle = '#636e72'; ctx.beginPath(); ctx.moveTo(pos.x, y - 4); ctx.lineTo(pos.x - 5, y - 10); ctx.lineTo(pos.x + 5, y - 10); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 11px "Fredoka", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.globalAlpha = 0.8;
-        ctx.fillText('NULL', pos.x, y);
+        // Draw a small finish flag
+        ctx.globalAlpha = 0.6;
+        ctx.strokeStyle = '#636e72'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(pos.x, pos.y + r + 4); ctx.lineTo(pos.x, flagY + 10); ctx.stroke();
+        // Checkered flag
+        const fSize = 6;
+        for (let fy = 0; fy < 2; fy++) {
+            for (let fx = 0; fx < 3; fx++) {
+                ctx.fillStyle = (fx + fy) % 2 === 0 ? '#2d3436' : '#fff';
+                ctx.fillRect(pos.x + 2 + fx * fSize, flagY - 2 + fy * fSize, fSize, fSize);
+            }
+        }
+        ctx.strokeStyle = '#2d3436'; ctx.lineWidth = 1;
+        ctx.strokeRect(pos.x + 2, flagY - 2, fSize * 3, fSize * 2);
+        // Label
+        ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 10px "Fredoka", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.globalAlpha = 0.7;
+        ctx.fillText('🏁 FINISH', pos.x, flagY + fSize * 2 + 4);
         ctx.restore();
     }
 
@@ -1229,60 +1573,114 @@ class BoardRenderer {
         const r = this.NODE_RADIUS;
         const colors = this.COLOR_MAP[node.color] || this.COLOR_MAP.gray;
         ctx.save();
-        if (isHovered) { ctx.translate(pos.x, pos.y); ctx.scale(1.15, 1.15); ctx.translate(-pos.x, -pos.y); }
+        if (isHovered) { ctx.translate(pos.x, pos.y); ctx.scale(1.12, 1.12); ctx.translate(-pos.x, -pos.y); }
         if (isOrphan) ctx.globalAlpha = 0.4;
+
+        // Outer glow ring
         if (isHovered || isCycle || isBroken) {
             const gc = isCycle || isBroken ? '#e74c3c' : colors.glow;
-            const ps = isCycle || isBroken ? r + 8 + Math.sin(this.pulsePhase * 3) * 4 : r + 6;
-            ctx.beginPath(); ctx.arc(pos.x, pos.y, ps, 0, Math.PI * 2); ctx.fillStyle = gc; ctx.globalAlpha = isOrphan ? 0.15 : 0.25; ctx.fill(); ctx.globalAlpha = isOrphan ? 0.4 : 1.0;
+            const ps = isCycle || isBroken ? r + 10 + Math.sin(this.pulsePhase * 3) * 4 : r + 8;
+            ctx.beginPath(); ctx.arc(pos.x, pos.y, ps, 0, Math.PI * 2);
+            ctx.fillStyle = gc; ctx.globalAlpha = isOrphan ? 0.15 : 0.2; ctx.fill();
+            ctx.globalAlpha = isOrphan ? 0.4 : 1.0;
         }
-        ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 8; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 3;
-        const grad = ctx.createRadialGradient(pos.x - r * 0.3, pos.y - r * 0.3, r * 0.1, pos.x, pos.y, r);
+
+        // White base circle (candy border look)
+        ctx.shadowColor = 'rgba(0,0,0,0.18)'; ctx.shadowBlur = 12; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 4;
+        ctx.beginPath(); ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+        ctx.shadowColor = 'transparent';
+
+        // Colored fill with gradient
+        const grad = ctx.createRadialGradient(pos.x - r * 0.25, pos.y - r * 0.3, r * 0.1, pos.x, pos.y, r);
         grad.addColorStop(0, colors.glow); grad.addColorStop(1, colors.fill);
         ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fillStyle = grad; ctx.fill();
-        ctx.shadowColor = 'transparent'; ctx.strokeStyle = isOrphan ? '#95a5a6' : (isCycle || isBroken ? '#e74c3c' : colors.stroke); ctx.lineWidth = isHovered ? 3 : 2;
+
+        // Colored border
+        ctx.strokeStyle = isOrphan ? '#95a5a6' : (isCycle || isBroken ? '#e74c3c' : colors.stroke);
+        ctx.lineWidth = isHovered ? 3.5 : 2.5;
         if (isCycle) ctx.setLineDash([6, 3]);
         ctx.stroke(); ctx.setLineDash([]);
-        // Shine
-        ctx.beginPath(); ctx.arc(pos.x - r * 0.25, pos.y - r * 0.3, r * 0.35, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
-        // ID
-        ctx.fillStyle = '#2d3436'; ctx.font = `bold ${r * 0.65}px "Fredoka", "Comic Sans MS", cursive`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+        // Shine highlights
+        ctx.beginPath(); ctx.arc(pos.x - r * 0.22, pos.y - r * 0.28, r * 0.32, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(pos.x + r * 0.15, pos.y + r * 0.2, r * 0.12, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill();
+
+        // Node ID
+        ctx.fillStyle = '#2d3436'; ctx.font = `bold ${r * 0.6}px "Fredoka", "Comic Sans MS", cursive`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(node.id), pos.x, pos.y);
-        // Name
-        ctx.fillStyle = isOrphan ? '#95a5a6' : '#2d3436'; ctx.font = `${Math.max(9, r * 0.35)}px "Fredoka", "Comic Sans MS", cursive`; ctx.textBaseline = 'top';
-        ctx.fillText(node.name, pos.x, pos.y + r + 4, 100);
+
+        // Node name — smart positioned away from neighbors
+        ctx.fillStyle = isOrphan ? '#95a5a6' : '#2d3436';
+        ctx.font = `500 ${Math.max(10, r * 0.38)}px "Fredoka", "Comic Sans MS", cursive`;
+        const labelInfo = this._labelOffsets?.get(node.id) || { dx: 0, dy: 1, align: 'center', baseline: 'top' };
+        ctx.textAlign = labelInfo.align;
+        ctx.textBaseline = labelInfo.baseline;
+        const labelDist = r + 10;
+        const lx = pos.x + labelInfo.dx * labelDist;
+        const ly = pos.y + labelInfo.dy * labelDist;
+        ctx.fillText(node.name, lx, ly, 120);
+
         // Debug badges
-        if (isOrphan) { ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#e67e22'; ctx.textBaseline = 'middle'; ctx.fillText('⚠️', pos.x + r + 2, pos.y - r + 2); }
-        if (isCycle) { ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#e74c3c'; ctx.textBaseline = 'middle'; ctx.fillText('🔄', pos.x + r + 2, pos.y); }
+        if (isOrphan) { ctx.font = 'bold 16px sans-serif'; ctx.fillStyle = '#e67e22'; ctx.textBaseline = 'middle'; ctx.fillText('⚠️', pos.x + r + 4, pos.y - r + 2); }
+        if (isCycle) { ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = '#e74c3c'; ctx.textBaseline = 'middle'; ctx.fillText('🔄', pos.x + r + 4, pos.y); }
         ctx.restore();
     }
 
     _drawHeadMarker(ctx) {
         const headPos = this._nodePositions.get(this.loader.head);
         if (!headPos) return;
-        const x = headPos.x, y = headPos.y - this.NODE_RADIUS - 28;
-        const bounce = Math.sin(this.pulsePhase * 2) * 3;
+        const r = this.NODE_RADIUS;
+        const x = headPos.x, y = headPos.y - r - 36;
+        const bounce = Math.sin(this.pulsePhase * 2) * 4;
         ctx.save();
-        ctx.fillStyle = '#e74c3c'; ctx.globalAlpha = 0.9;
-        ctx.beginPath(); ctx.moveTo(x, y + 16 + bounce); ctx.lineTo(x - 8, y + 6 + bounce); ctx.lineTo(x + 8, y + 6 + bounce); ctx.closePath(); ctx.fill();
-        ctx.font = 'bold 14px "Fredoka", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        ctx.fillText('HEAD', x, y + 4 + bounce);
+        // Banner background
+        const bannerW = 56, bannerH = 22;
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        this._roundRect(ctx, x - bannerW / 2, y - bannerH / 2 + bounce, bannerW, bannerH, 6);
+        ctx.fill();
+        // Arrow pointing down
+        ctx.beginPath();
+        ctx.moveTo(x - 6, y + bannerH / 2 + bounce);
+        ctx.lineTo(x + 6, y + bannerH / 2 + bounce);
+        ctx.lineTo(x, y + bannerH / 2 + 8 + bounce);
+        ctx.closePath(); ctx.fill();
+        // Text
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px "Fredoka", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('▶ HEAD', x, y + bounce);
         ctx.restore();
     }
 
     _drawPlayerTokens(ctx) {
         let idx = 0;
+        const r = this.NODE_RADIUS;
         for (const [playerId, nodeId] of Object.entries(this.playerPositions)) {
             const pos = this._nodePositions.get(nodeId);
             if (!pos) continue;
             const color = this.playerColors[idx % this.playerColors.length];
-            const offset = (idx - Object.keys(this.playerPositions).length / 2) * 14;
-            const tx = pos.x + offset, ty = pos.y - this.NODE_RADIUS - 8;
+            const numPlayers = Object.keys(this.playerPositions).length;
+            const offset = (idx - (numPlayers - 1) / 2) * 18;
+            const tx = pos.x + offset, ty = pos.y - r - 14;
+            const tokenBounce = Math.sin(this.pulsePhase * 2.5 + idx) * 2;
+
             ctx.save();
-            ctx.fillStyle = color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.arc(tx, ty, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(String(parseInt(playerId) + 1), tx, ty);
+            // Token shadow
+            ctx.globalAlpha = 0.2; ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.ellipse(tx, ty + 12, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+            // Token body
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = color; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.arc(tx, ty + tokenBounce, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            // Player number
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 10px "Fredoka", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(String(parseInt(playerId) + 1), tx, ty + tokenBounce);
             ctx.restore();
             idx++;
         }
@@ -1299,13 +1697,15 @@ class BoardRenderer {
             if (node.inCycle) lines.push('CYCLE detected');
             if (node.hasBrokenPointer) lines.push(`Broken ptr: ${node.brokenPointers.join(', ')}`);
         }
-        const pad = 10, lh = 18, tw = 220, th = lines.length * lh + pad * 2;
-        let tipX = pos.x + this.NODE_RADIUS + 15, tipY = pos.y - th / 2;
-        if (tipX + tw > this.canvas.width) tipX = pos.x - this.NODE_RADIUS - 15 - tw;
+        const pad = 12, lh = 20, tw = 230, th = lines.length * lh + pad * 2;
+        let tipX = pos.x + this.NODE_RADIUS + 20, tipY = pos.y - th / 2;
+        if (tipX + tw > this.canvas.width) tipX = pos.x - this.NODE_RADIUS - 20 - tw;
         if (tipY < 5) tipY = 5;
         if (tipY + th > this.canvas.height - 5) tipY = this.canvas.height - 5 - th;
         ctx.save();
-        ctx.fillStyle = 'rgba(45, 52, 54, 0.92)'; ctx.beginPath(); this._roundRect(ctx, tipX, tipY, tw, th, 8); ctx.fill();
+        ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
+        ctx.fillStyle = 'rgba(45, 52, 54, 0.94)'; ctx.beginPath(); this._roundRect(ctx, tipX, tipY, tw, th, 12); ctx.fill();
+        ctx.shadowColor = 'transparent';
         ctx.fillStyle = '#dfe6e9'; ctx.font = '13px "Fredoka", monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
         lines.forEach((line, i) => ctx.fillText(line, tipX + pad, tipY + pad + i * lh));
         ctx.restore();
@@ -1325,7 +1725,7 @@ class BoardRenderer {
         this.hoverNode = null;
         for (const [id, pos] of this._nodePositions) {
             const dx = this._mouseX - pos.x, dy = this._mouseY - pos.y;
-            if (dx * dx + dy * dy <= this.NODE_RADIUS * this.NODE_RADIUS * 1.3) { this.hoverNode = id; this.canvas.style.cursor = 'pointer'; return; }
+            if (dx * dx + dy * dy <= (this.NODE_RADIUS + 4) * (this.NODE_RADIUS + 4) * 1.3) { this.hoverNode = id; this.canvas.style.cursor = 'pointer'; return; }
         }
         this.canvas.style.cursor = 'default';
     }
@@ -1343,7 +1743,7 @@ class BoardRenderer {
     }
 
     destroy() { this._animating = false; }
-    invalidateLayout() { this._nodePositions.clear(); }
+    invalidateLayout() { this._nodePositions.clear(); this._decorationsComputed = false; }
     getNodePosition(nodeId) { return this._nodePositions.get(nodeId) || null; }
 }
     </script>
@@ -1680,40 +2080,40 @@ const SAMPLE_BOARD_DATA = {
     }
   },
   "nodes": [
-    { "id": 1,  "color": "red",    "name": "Candy Cane Gate",      "zone": "Gumdrop Grove",       "next": [2],    "x": 0.05, "y": 0.50 },
-    { "id": 2,  "color": "blue",   "name": "Blueberry Bend",       "zone": "Gumdrop Grove",       "next": [3],    "x": 0.12, "y": 0.45 },
-    { "id": 3,  "color": "yellow", "name": "Lemon Drop Lane",      "zone": "Gumdrop Grove",       "next": [4],    "x": 0.19, "y": 0.40 },
-    { "id": 4,  "color": "green",  "name": "Gumdrop Garden",       "zone": "Gumdrop Grove",       "next": [5],    "x": 0.26, "y": 0.35 },
-    { "id": 5,  "color": "purple", "name": "Plum Pudding Plaza",   "zone": "Gumdrop Grove",       "next": [6, 16],"x": 0.33, "y": 0.30 },
+    { "id": 1,  "color": "red",    "name": "Candy Cane Gate",      "zone": "Gumdrop Grove",       "next": [2],    "x": 0.04, "y": 0.12 },
+    { "id": 2,  "color": "blue",   "name": "Blueberry Bend",       "zone": "Gumdrop Grove",       "next": [3],    "x": 0.12, "y": 0.08 },
+    { "id": 3,  "color": "yellow", "name": "Lemon Drop Lane",      "zone": "Gumdrop Grove",       "next": [4],    "x": 0.20, "y": 0.06 },
+    { "id": 4,  "color": "green",  "name": "Gumdrop Garden",       "zone": "Gumdrop Grove",       "next": [5],    "x": 0.28, "y": 0.08 },
+    { "id": 5,  "color": "purple", "name": "Plum Pudding Plaza",   "zone": "Gumdrop Grove",       "next": [6, 16],"x": 0.36, "y": 0.14 },
 
-    { "id": 6,  "color": "orange", "name": "Tangerine Twist",      "zone": "Licorice Loop",       "next": [7],    "x": 0.40, "y": 0.22 },
-    { "id": 7,  "color": "red",    "name": "Cherry Chute",         "zone": "Licorice Loop",       "next": [8],    "x": 0.48, "y": 0.18 },
-    { "id": 8,  "color": "blue",   "name": "Sapphire Swirl",       "zone": "Licorice Loop",       "next": [9],    "x": 0.56, "y": 0.15 },
-    { "id": 9,  "color": "yellow", "name": "Butterscotch Bridge",  "zone": "Licorice Loop",       "next": [10],   "x": 0.64, "y": 0.18 },
-    { "id": 10, "color": "green",  "name": "Mint Meringue",        "zone": "Licorice Loop",       "next": [11],   "x": 0.72, "y": 0.22 },
+    { "id": 6,  "color": "green",  "name": "Tangerine Twist",      "zone": "Licorice Loop",       "next": [7],    "x": 0.46, "y": 0.08 },
+    { "id": 7,  "color": "yellow", "name": "Cherry Chute",         "zone": "Licorice Loop",       "next": [8],    "x": 0.56, "y": 0.04 },
+    { "id": 8,  "color": "blue",   "name": "Sapphire Swirl",       "zone": "Licorice Loop",       "next": [9],    "x": 0.66, "y": 0.04 },
+    { "id": 9,  "color": "orange", "name": "Butterscotch Bridge",  "zone": "Licorice Loop",       "next": [10],   "x": 0.76, "y": 0.08 },
+    { "id": 10, "color": "red",    "name": "Mint Meringue",        "zone": "Licorice Loop",       "next": [11],   "x": 0.86, "y": 0.14 },
 
-    { "id": 11, "color": "purple", "name": "Cookie Crumble Cliff", "zone": "Cookie Canyon",       "next": [12],   "x": 0.78, "y": 0.30 },
-    { "id": 12, "color": "orange", "name": "Caramel Cavern",       "zone": "Cookie Canyon",       "next": [13],   "x": 0.82, "y": 0.38 },
-    { "id": 13, "color": "red",    "name": "Snickerdoodle Summit", "zone": "Cookie Canyon",       "next": [14],   "x": 0.86, "y": 0.46 },
-    { "id": 14, "color": "blue",   "name": "Brownie Basin",        "zone": "Cookie Canyon",       "next": [15],   "x": 0.82, "y": 0.54 },
+    { "id": 11, "color": "purple", "name": "Cookie Crumble Cliff", "zone": "Cookie Canyon",       "next": [12],   "x": 0.93, "y": 0.24 },
+    { "id": 12, "color": "orange", "name": "Caramel Cavern",       "zone": "Cookie Canyon",       "next": [13],   "x": 0.96, "y": 0.36 },
+    { "id": 13, "color": "red",    "name": "Snickerdoodle Summit", "zone": "Cookie Canyon",       "next": [14],   "x": 0.93, "y": 0.48 },
+    { "id": 14, "color": "blue",   "name": "Brownie Basin",        "zone": "Cookie Canyon",       "next": [15],   "x": 0.86, "y": 0.58 },
     { "id": 15, "color": "yellow", "name": "Shortbread Shore",     "zone": "Cookie Canyon",       "next": [25],   "x": 0.78, "y": 0.62 },
 
-    { "id": 16, "color": "orange", "name": "Taffy Turn",           "zone": "Marshmallow Meadows", "next": [17],   "x": 0.33, "y": 0.45 },
-    { "id": 17, "color": "red",    "name": "Strawberry Stream",    "zone": "Marshmallow Meadows", "next": [18],   "x": 0.38, "y": 0.55 },
-    { "id": 18, "color": "green",  "name": "Pistachio Patch",      "zone": "Marshmallow Meadows", "next": [19],   "x": 0.44, "y": 0.62 },
-    { "id": 19, "color": "blue",   "name": "Cotton Candy Cloud",   "zone": "Marshmallow Meadows", "next": [20],   "x": 0.50, "y": 0.68 },
-    { "id": 20, "color": "purple", "name": "Marshmallow Mountain", "zone": "Marshmallow Meadows", "next": [21],   "x": 0.56, "y": 0.72 },
-    { "id": 21, "color": "yellow", "name": "Honeycomb Hollow",     "zone": "Marshmallow Meadows", "next": [22],   "x": 0.62, "y": 0.68 },
-    { "id": 22, "color": "orange", "name": "Peach Cobbler Pass",   "zone": "Marshmallow Meadows", "next": [23],   "x": 0.68, "y": 0.62 },
-    { "id": 23, "color": "red",    "name": "Raspberry Ridge",      "zone": "Marshmallow Meadows", "next": [24],   "x": 0.72, "y": 0.56 },
-    { "id": 24, "color": "green",  "name": "Lime Lagoon",          "zone": "Marshmallow Meadows", "next": [25],   "x": 0.76, "y": 0.50 },
+    { "id": 16, "color": "red",    "name": "Taffy Turn",           "zone": "Marshmallow Meadows", "next": [17],   "x": 0.30, "y": 0.28 },
+    { "id": 17, "color": "blue",   "name": "Strawberry Stream",    "zone": "Marshmallow Meadows", "next": [18],   "x": 0.22, "y": 0.38 },
+    { "id": 18, "color": "green",  "name": "Pistachio Patch",      "zone": "Marshmallow Meadows", "next": [19],   "x": 0.16, "y": 0.50 },
+    { "id": 19, "color": "blue",   "name": "Cotton Candy Cloud",   "zone": "Marshmallow Meadows", "next": [20],   "x": 0.14, "y": 0.62 },
+    { "id": 20, "color": "purple", "name": "Marshmallow Mountain", "zone": "Marshmallow Meadows", "next": [21],   "x": 0.18, "y": 0.74 },
+    { "id": 21, "color": "yellow", "name": "Honeycomb Hollow",     "zone": "Marshmallow Meadows", "next": [22],   "x": 0.26, "y": 0.82 },
+    { "id": 22, "color": "orange", "name": "Peach Cobbler Pass",   "zone": "Marshmallow Meadows", "next": [23],   "x": 0.36, "y": 0.84 },
+    { "id": 23, "color": "red",    "name": "Raspberry Ridge",      "zone": "Marshmallow Meadows", "next": [24],   "x": 0.46, "y": 0.80 },
+    { "id": 24, "color": "green",  "name": "Lime Lagoon",          "zone": "Marshmallow Meadows", "next": [25],   "x": 0.56, "y": 0.72 },
 
-    { "id": 25, "color": "purple", "name": "Peppermint Path",      "zone": "Lollipop Forest",     "next": [26],   "x": 0.72, "y": 0.72 },
-    { "id": 26, "color": "orange", "name": "Toffee Trail",         "zone": "Lollipop Forest",     "next": [27],   "x": 0.64, "y": 0.78 },
-    { "id": 27, "color": "blue",   "name": "Bubblegum Bridge",     "zone": "Lollipop Forest",     "next": [28],   "x": 0.55, "y": 0.82 },
-    { "id": 28, "color": "yellow", "name": "Jellybean Junction",   "zone": "Lollipop Forest",     "next": [29],   "x": 0.45, "y": 0.85 },
-    { "id": 29, "color": "red",    "name": "Rock Candy Road",      "zone": "Lollipop Forest",     "next": [30],   "x": 0.35, "y": 0.88 },
-    { "id": 30, "color": "green",  "name": "Sugar Plum Palace",    "zone": "Lollipop Forest",     "next": [],     "x": 0.25, "y": 0.92 }
+    { "id": 25, "color": "purple", "name": "Peppermint Path",      "zone": "Lollipop Forest",     "next": [26],   "x": 0.68, "y": 0.68 },
+    { "id": 26, "color": "orange", "name": "Toffee Trail",         "zone": "Lollipop Forest",     "next": [27],   "x": 0.64, "y": 0.80 },
+    { "id": 27, "color": "blue",   "name": "Bubblegum Bridge",     "zone": "Lollipop Forest",     "next": [28],   "x": 0.56, "y": 0.90 },
+    { "id": 28, "color": "yellow", "name": "Jellybean Junction",   "zone": "Lollipop Forest",     "next": [29],   "x": 0.46, "y": 0.94 },
+    { "id": 29, "color": "red",    "name": "Rock Candy Road",      "zone": "Lollipop Forest",     "next": [30],   "x": 0.34, "y": 0.94 },
+    { "id": 30, "color": "green",  "name": "Sugar Plum Palace",    "zone": "Lollipop Forest",     "next": [],     "x": 0.22, "y": 0.90 }
   ]
 };
 
